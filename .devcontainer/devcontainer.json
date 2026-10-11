@@ -1,0 +1,26 @@
+{
+  "name": "IUB Lost & Found — CSE309",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "forwardPorts": [5173, 8000],
+  "portsAttributes": {
+    "5173": {
+      "label": "IUB Lost & Found frontend",
+      "onAutoForward": "openBrowser"
+    },
+    "8000": {
+      "label": "FastAPI backend",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  },
+  "postCreateCommand": "python -m pip install -r backend/requirements.txt && npm --prefix frontend install"
+}

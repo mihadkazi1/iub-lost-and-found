@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.coverage
+
+# Local database and secrets
+backend/data/*
+!backend/data/.gitkeep
+.env
+.env.*
+!backend/.env.example
+
+# Node / Vite
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
