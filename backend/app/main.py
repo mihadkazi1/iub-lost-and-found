@@ -22,6 +22,7 @@ from .schemas import (
     ItemCreate,
     ItemPublic,
     ItemStatusUpdate,
+    ItemUpdate,
     LoginRequest,
     LoginResponse,
     StatsResponse,
@@ -74,7 +75,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in configured_origins.split(",") if origin.strip()],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -294,6 +295,20 @@ def list_items(
     return [_serialize_item(item, current_user) for item in items]
 
 
+@app.get("/api/items/{item_id}", response_model=ItemPublic, tags=["board"])
+def get_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: Student | None = Depends(get_optional_user),
+) -> dict:
+    """Read one report. Contact instructions are only included for the owner."""
+    item = db.scalar(select(Item).options(joinedload(Item.owner)).where(Item.id == item_id))
+    if item is None:
+        raise HTTPException(status_code=404, detail="This report could not be found.")
+    is_owner = bool(current_user and current_user.id == item.owner_id)
+    return _serialize_item(item, current_user, include_contact=is_owner)
+
+
 @app.post("/api/items", response_model=ItemPublic, status_code=201, tags=["board"])
 def create_item(
     payload: ItemCreate,
@@ -316,6 +331,33 @@ def create_item(
     db.refresh(item)
     item = db.scalar(select(Item).options(joinedload(Item.owner)).where(Item.id == item.id))
     return _serialize_item(item, current_user)
+
+
+@app.put("/api/items/{item_id}", response_model=ItemPublic, tags=["board"])
+def update_item(
+    item_id: int,
+    payload: ItemUpdate,
+    db: Session = Depends(get_db),
+    current_user: Student = Depends(get_current_user),
+) -> dict:
+    """Update a report's editable fields. Only its owner may modify it."""
+    item = db.scalar(select(Item).options(joinedload(Item.owner)).where(Item.id == item_id))
+    if item is None:
+        raise HTTPException(status_code=404, detail="This report could not be found.")
+    if item.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only update your own reports.")
+
+    changes = payload.model_dump(exclude_unset=True)
+    for field in ("title", "description", "category", "report_type", "location", "incident_date", "contact_info"):
+        if field in changes:
+            setattr(item, field, changes[field])
+    # If image_data is omitted, preserve the current image. Explicit null removes it.
+    if "image_data" in changes:
+        item.image_data = changes["image_data"]
+    db.commit()
+    db.refresh(item)
+    item = db.scalar(select(Item).options(joinedload(Item.owner)).where(Item.id == item_id))
+    return _serialize_item(item, current_user, include_contact=True)
 
 
 @app.get("/api/items/{item_id}/image", tags=["board"])

@@ -111,6 +111,10 @@ class ItemCreate(BaseModel):
         return value.strip()
 
 
+class ItemUpdate(ItemCreate):
+    """Full report update. image_data may be omitted to preserve an existing photo."""
+
+
 class ItemStatusUpdate(BaseModel):
     status: Literal["open", "resolved"]
 

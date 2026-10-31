@@ -555,3 +555,22 @@ button:disabled { opacity: .62; cursor: wait; }
   .card-art-wrap .item-photo { height: 100%; min-height: 150px; width: 100%; }
   .contact-item-summary .contact-item-photo { width: 74px; height: 74px; }
 }
+
+
+/* Single-report details view for the CSE309 CRUD demonstration. */
+.item-details-layout { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1.2fr); gap: 22px; margin: 4px 0 20px; }
+.item-details-photo { min-height: 210px; max-height: 310px; overflow: hidden; border-radius: 13px; background: #eef3ed; display: grid; place-items: center; }
+.item-details-photo > img { width: 100%; height: 100%; max-height: 310px; object-fit: cover; }
+.item-details-content h3 { margin: 11px 0 8px; color: var(--green-deep); font-size: 22px; line-height: 1.2; }
+.details-badges { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.details-status { display: inline-flex; border-radius: 999px; padding: 5px 9px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.details-status.open { background: #e6f3e7; color: #2d7145; }
+.details-status.resolved { background: #eff0ef; color: #67736c; }
+.details-description { font-size: 12px; line-height: 1.7; color: #62746b; white-space: pre-wrap; }
+.details-list { display: grid; gap: 9px; margin: 15px 0 0; }
+.details-list > div { display: grid; grid-template-columns: minmax(90px, .72fr) minmax(0, 1.28fr); gap: 10px; padding-bottom: 8px; border-bottom: 1px solid #e8eee8; }
+.details-list dt { color: #78877d; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.details-list dd { color: #304a3e; font-size: 11px; line-height: 1.55; margin: 0; overflow-wrap: anywhere; }
+.edit-button { color: #426e8c; border-color: #dce9f0; background: #f1f8fc; }
+.edit-button:hover { background: #e4f1f8; }
+@media (max-width: 650px) { .item-details-layout { grid-template-columns: 1fr; } .item-details-photo { min-height: 160px; max-height: 220px; } }

@@ -81,6 +81,33 @@ def test_report_lifecycle_and_contact_privacy(client: TestClient):
     assert created.status_code == 201
     assert created.json()["image_url"] is not None
     item_id = created.json()["id"]
+    # Read Single: guests see the report but not contact instructions; owner sees edit data.
+    single_guest = client.get(f"/api/items/{item_id}")
+    assert single_guest.status_code == 200
+    assert single_guest.json()["title"] == "Test privacy item"
+    assert single_guest.json()["contact_info"] is None
+    single_owner = client.get(f"/api/items/{item_id}", headers=owner_headers)
+    assert single_owner.status_code == 200
+    assert single_owner.json()["contact_info"] == "Contact the report owner for the test."
+
+    # Full Update: owner can edit fields; omitting image_data preserves the existing photo.
+    updated = client.put(
+        f"/api/items/{item_id}",
+        headers=owner_headers,
+        json={
+            "title": "Test privacy item edited",
+            "description": "This item exists for an API test and now has edited details.",
+            "category": "Other",
+            "report_type": "lost",
+            "location": "Updated test room",
+            "incident_date": None,
+            "contact_info": "Updated contact instructions for the report owner.",
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "Test privacy item edited"
+    assert updated.json()["location"] == "Updated test room"
+
     photo_response = client.get(f"/api/items/{item_id}/image")
     assert photo_response.status_code == 200
     assert photo_response.content == b"hello"
@@ -95,7 +122,7 @@ def test_report_lifecycle_and_contact_privacy(client: TestClient):
     assert client.get(f"/api/items/{item_id}/contact").status_code == 401
     contact = client.get(f"/api/items/{item_id}/contact", headers=owner_headers)
     assert contact.status_code == 200
-    assert contact.json()["contact_info"] == "Contact the report owner for the test."
+    assert contact.json()["contact_info"] == "Updated contact instructions for the report owner."
     assert contact.json()["phone_number"] == "01712345678"
     assert contact.json()["whatsapp_number"] == "01712345679"
 
@@ -105,12 +132,21 @@ def test_report_lifecycle_and_contact_privacy(client: TestClient):
     )
     other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
     assert client.patch(f"/api/items/{item_id}/status", headers=other_headers, json={"status": "resolved"}).status_code == 403
+    assert client.put(
+        f"/api/items/{item_id}", headers=other_headers,
+        json={"title": "Unauthorized edited item", "description": "This update should be denied by owner authorization.", "category": "Other", "report_type": "lost", "location": "Test room", "incident_date": None, "contact_info": "Should not update"},
+    ).status_code == 403
     assert client.delete(f"/api/items/{item_id}", headers=other_headers).status_code == 403
 
     resolved = client.patch(f"/api/items/{item_id}/status", headers=owner_headers, json={"status": "resolved"})
     assert resolved.status_code == 200
     assert resolved.json()["status"] == "resolved"
     assert client.delete(f"/api/items/{item_id}", headers=owner_headers).status_code == 204
+
+
+def test_read_single_item_returns_404_for_missing_id(client: TestClient):
+    response = client.get("/api/items/999999")
+    assert response.status_code == 404
 
 
 def test_login_requires_phone_number(client: TestClient):

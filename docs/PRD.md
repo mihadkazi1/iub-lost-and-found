@@ -2,7 +2,7 @@
 
 **Product:** IUB Lost & Found  
 **Course:** CSE309  
-**Document status:** Demo project baseline, version 1.1  
+**Document status:** MVP assessment baseline, version 1.2  
 **Product type:** Responsive campus web application
 
 ## 1. Product summary
@@ -43,8 +43,8 @@ Lost belongings are often reported in separate Messenger groups, class chats, or
 - **MVP-04:** Browse reports and search title, description, category, and location.
 - **MVP-05:** Filter by Lost / Found, category, and Open / Resolved status.
 - **MVP-06:** View the reporter’s phone number, WhatsApp contact, optional additional contact information, and report-specific instructions after signing in.
-- **MVP-07:** Report owners can mark a report Resolved or delete their own report.
-- **MVP-08:** REST API backed by SQLite, with a small set of seeded example reports.
+- **MVP-07:** Students can open a single report detail view; report owners can edit all report fields, mark a report Resolved or Open, and delete their own report.
+- **MVP-08:** REST API backed by a relational database through SQLAlchemy. SQLite is used locally; a managed PostgreSQL URL can be configured for deployment. Includes a small set of seeded example reports.
 - **MVP-09:** Public aggregate counts for total, open, lost, found, and resolved reports.
 - **MVP-10:** PRD, SRS, and TDD in the repository's `docs/` folder.
 
@@ -69,13 +69,15 @@ The following are planned, not claimed as implemented in version 1.0:
 | FR-03 | Search and filtering | MVP | Keyword, type, category, and status filters can be combined and reset. |
 | FR-04 | Create report | MVP | Signed-in users can submit valid item details and an optional JPG/PNG/WebP photo up to 2 MB; invalid or missing required fields are rejected. |
 | FR-05 | Contact instructions | MVP | Guest users cannot fetch contact instructions or reporter phone/WhatsApp details; signed-in users can request these through the API. |
-| FR-06 | Update status | MVP | Only the report owner can change Open to Resolved. |
-| FR-07 | Delete report | MVP | Only the report owner can delete their report. |
-| FR-08 | Activity totals | MVP | Counts reflect persisted report data. |
-| FR-09 | Session logout | MVP | Logging out invalidates the current server-side session and clears the frontend token. |
-| FR-10 | Verified institutional access | Beta | Only verified IUB users can sign in through the institution's approved identity system. |
-| FR-11 | Moderation and roles | Beta | Authorized moderators can manage inappropriate reports; ordinary students cannot use moderator actions. |
-| FR-12 | Profile dashboard | Beta | A signed-in student can view their own reports and their current status. |
+| FR-06 | Read single report | MVP | Selecting Details retrieves one report by ID and displays its complete non-private details. Only the owner may see their own report-specific edit instructions in the edit form. |
+| FR-07 | Update report | MVP | Only the report owner can edit report title, description, category, lost/found type, location, incident date, photo, and contact instructions. Omitting a photo during an edit preserves the current photo; explicit removal clears it. |
+| FR-08 | Update status | MVP | Only the report owner can change Open / Resolved status. |
+| FR-09 | Delete report | MVP | Only the report owner can delete their report. |
+| FR-10 | Activity totals | MVP | Counts reflect persisted report data. |
+| FR-11 | Session logout | MVP | Logging out invalidates the current server-side session and clears the frontend token. |
+| FR-12 | Verified institutional access | Beta | Only verified IUB users can sign in through the institution's approved identity system. |
+| FR-13 | Moderation and roles | Beta | Authorized moderators can manage inappropriate reports; ordinary students cannot use moderator actions. |
+| FR-14 | Profile dashboard | Beta | A signed-in student can view their own reports and their current status. |
 
 ## 7. Non-goals for the MVP
 
@@ -97,7 +99,7 @@ The following are planned, not claimed as implemented in version 1.0:
 
 - A fresh workspace starts both applications using the documented commands.
 - A visitor can search the seeded board without signing in.
-- A student can sign in with a phone number, publish a report with an optional photo, see the report on the board, view reporter contact details after signing in, mark their own report resolved, and delete their own report.
+- A student can sign in with a phone number, create a report with an optional photo, open a single report’s details, edit their own report, mark it resolved, reopen it if needed, and delete it. A guest cannot perform any report mutation.
 - API validation and ownership rules reject invalid or unauthorized requests.
 - The three design documents agree with the implemented MVP and explicitly mark Beta work as future scope.
 

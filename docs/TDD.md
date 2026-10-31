@@ -1,7 +1,7 @@
 # Technical Design Document (TDD)
 
 **System:** IUB Lost & Found  
-**Version:** 1.1  
+**Version:** 1.2  
 **Course:** CSE309
 
 ## 1. Design overview
@@ -15,13 +15,13 @@ flowchart TD
     C --> D[Validation schemas]
     C --> E[Session and ownership checks]
     C --> F[SQLAlchemy models]
-    F --> G[(SQLite database in workspace)]
+    F --> G[(SQLite locally / PostgreSQL when deployed)]
     G --> F --> C --> B
 ```
 
 ### Release allocation
 
-- **MVP:** React + TypeScript, FastAPI + Python, Vite proxy, SQLite, demo sessions, CRUD REST API, public browse/search, contact endpoint, owner restrictions, documentation.
+- **MVP:** React + TypeScript, FastAPI + Python, Vite proxy, local SQLite (or a configured PostgreSQL URL), demo sessions, complete item CRUD REST API, public browse/search, single-item details view, contact endpoint, owner restrictions, documentation.
 - **Beta:** IUB SSO, Student/Moderator RBAC, profile dashboard, granular scopes, moderation, managed PostgreSQL, production deployment, secure image storage, monitoring and backups.
 
 ## 2. Repository layout
@@ -85,7 +85,7 @@ IUB-Lost-and-Found/
 - The bearer token is stored in browser local storage for this demonstration.
 - An initial `/api/auth/me` request restores a demo session when a token is present.
 - Search and filters trigger a board list request.
-- Create, resolve, and delete actions refresh board data and summary counts.
+- Create, read-single, full update, resolve/reopen, and delete actions are available in the frontend and refresh board data and summary counts.
 - API failures are shown as an error panel, form error, or toast rather than silently ignored.
 
 ## 4. Backend design
@@ -95,7 +95,7 @@ IUB-Lost-and-Found/
 - FastAPI exposes the REST API and interactive OpenAPI page at `/docs`.
 - Pydantic schemas validate incoming request data.
 - SQLAlchemy maps application records to relational tables.
-- SQLite is the default database, stored at `backend/data/lost_found.db` when the backend is launched from its folder.
+- SQLite is the default local database, stored at `backend/data/lost_found.db` when launched from `backend/`; production can use `DATABASE_URL=postgresql+psycopg://...`.
 - Uvicorn runs the application.
 
 ### 4.2 Request lifecycle
@@ -177,6 +177,8 @@ Base prefix: `/api`
 | `GET /stats` | Public | Total/open/resolved/lost/found counts. |
 | `GET /items` | Public | Optional `q`, `category`, `report_type`, `status`; returns at most 100 newest reports. Contact instructions are omitted. |
 | `POST /items` | Bearer session | Validated report body → created report, HTTP 201. |
+| `GET /items/{id}` | Public | Read a single report by ID; owner-only edit fields can include contact instructions. |
+| `PUT /items/{id}` | Owner only | Update the full report record; omitted photo keeps current image data. |
 | `GET /items/{id}/contact` | Bearer session | Reporter name, phone, WhatsApp, optional profile notes, and report-specific instructions. |
 | `GET /items/{id}/image` | Public | Serves the attached photo bytes, if present. |
 | `PATCH /items/{id}/status` | Owner only | `{ status: "open" | "resolved" }` → updated report. |
@@ -200,8 +202,9 @@ Base prefix: `/api`
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./data/lost_found.db` | SQLAlchemy connection URL. |
-| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated frontend origins allowed by CORS. |
+| `DATABASE_URL` | `sqlite:///./data/lost_found.db` | SQLAlchemy connection URL; use `postgresql+psycopg://...` for managed PostgreSQL. |
+| `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated frontend origins allowed by CORS. In Render, set it to the Vercel deployment origin. |
+| `VITE_API_BASE_URL` | empty | Frontend API origin. Empty means same-origin/Vite proxy in local development; set to the Render API URL in Vercel. |
 
 Launch the backend from the `backend/` directory so the default SQLite path resolves to `backend/data/lost_found.db`. The devcontainer forwards ports 5173 and 8000.
 
@@ -219,9 +222,9 @@ Codespaces is the development environment, not a database product. The default S
 
 ## 8. Test strategy
 
-- **Backend smoke tests:** health endpoint, public report list, login plus `/auth/me`.
+- **Backend tests:** health endpoint, public report list, login plus `/auth/me`, guest mutation rejection, report read-single, owner update and status-change, non-owner rejection, delete, and contact privacy.
 - **Build check:** `npm run build` must complete without TypeScript errors.
-- **Manual acceptance:** guest search, sign in, create report, contact instructions, resolve, delete.
+- **Manual acceptance:** guest search, sign in, create report, read single, edit fields, contact instructions, resolve/reopen, delete.
 - **Authorization:** try mutating a report with a different student's token and check for 403.
 - **Data privacy:** verify guest list responses do not contain contact instructions.
 - **Beta gate:** do not accept actual student identity data until verified authentication, approved hosting, and a privacy review exist.

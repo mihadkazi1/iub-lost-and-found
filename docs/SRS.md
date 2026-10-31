@@ -1,7 +1,7 @@
 # Software Requirements Specification (SRS)
 
 **System:** IUB Lost & Found  
-**Version:** 1.0  
+**Version:** 1.2  
 **Course:** CSE309
 
 ## 1. Introduction
@@ -12,7 +12,7 @@ This document defines the expected behavior, data, interfaces, and quality requi
 
 ### 1.2 Scope
 
-The system provides a searchable campus lost-and-found board. Its MVP consists of a React + TypeScript frontend, a FastAPI + Python backend, REST endpoints, and an SQLite database stored in the development workspace. Later Beta features are marked explicitly and are not represented as implemented.
+The system provides a searchable campus lost-and-found board. Its MVP consists of a React + TypeScript frontend, a FastAPI + Python backend, REST endpoints, and SQLAlchemy database integration. SQLite is used locally; deployment can use PostgreSQL through `DATABASE_URL`. Later Beta features are marked explicitly and are not represented as implemented.
 
 ### 1.3 Definitions
 
@@ -26,7 +26,7 @@ The system provides a searchable campus lost-and-found board. Its MVP consists o
 
 ### 2.1 Product perspective
 
-The frontend communicates with a single FastAPI service through JSON REST APIs. FastAPI reads and writes the SQLite database through SQLAlchemy. During local development, Vite proxies `/api` calls to `http://127.0.0.1:8000`.
+The frontend communicates with a single FastAPI service through JSON REST APIs. FastAPI reads and writes the configured relational database through SQLAlchemy. Locally, Vite proxies `/api` calls to `http://127.0.0.1:8000`; production can use `VITE_API_BASE_URL` to call a hosted API.
 
 ### 2.2 User classes
 
@@ -48,7 +48,7 @@ The frontend communicates with a single FastAPI service through JSON REST APIs. 
 
 - The required technology stack is React + TypeScript and FastAPI + Python.
 - The MVP has no trusted connection to IUB's student information system.
-- SQLite is appropriate for a coursework demo; a managed database is recommended before public production use.
+- SQLite is the local default; a managed PostgreSQL service is recommended for deployed demos that need data to persist across backend restarts.
 - The official IUB logo is referenced from the public IUB website, with a local monogram fallback.
 
 ### 2.5 Assumptions and dependencies
@@ -82,22 +82,24 @@ The frontend communicates with a single FastAPI service through JSON REST APIs. 
 - **SRS-FR-012 (MVP):** Required report input: title, description, category, report type, location, and contact instructions. Incident date and item photo are optional; photos must be JPG/PNG/WebP and at most 2 MB.
 - **SRS-FR-013 (MVP):** Validate lengths, supported categories, and allowed report type values at the API boundary.
 - **SRS-FR-014 (MVP):** A report starts with status `open`.
-- **SRS-FR-015 (MVP):** Only the report owner can update status to `open` or `resolved`.
-- **SRS-FR-016 (MVP):** Only the report owner can delete a report.
-- **SRS-FR-017 (MVP):** A rejected or unauthenticated mutation returns an appropriate HTTP error without changing data.
+- **SRS-FR-015 (MVP):** `GET /api/items/{id}` reads one report by ID and returns 404 for an unknown report. Contact instructions remain hidden from guests and other students.
+- **SRS-FR-016 (MVP):** `PUT /api/items/{id}` lets the report owner update the full report: title, description, category, report type, location, incident date, and contact instructions. The photo is preserved when `image_data` is omitted and removed when it is explicitly set to null.
+- **SRS-FR-017 (MVP):** Only the report owner can update status to `open` or `resolved`.
+- **SRS-FR-018 (MVP):** Only the report owner can delete a report.
+- **SRS-FR-019 (MVP):** A rejected or unauthenticated mutation returns an appropriate HTTP error without changing data.
 
 ### 3.4 Contact protection
 
-- **SRS-FR-018 (MVP):** Guest list responses omit contact instructions.
-- **SRS-FR-019 (MVP):** A signed-in user can request reporter phone/WhatsApp details, optional extra contact information, and report-specific contact instructions for an existing report.
-- **SRS-FR-020 (MVP):** A request for a nonexistent report returns HTTP 404.
-- **SRS-FR-021 (Beta):** Add abuse reporting, automated redaction of sensitive card data, and moderator review.
+- **SRS-FR-020 (MVP):** Guest list and single-report responses omit contact instructions.
+- **SRS-FR-021 (MVP):** A signed-in user can request reporter phone/WhatsApp details, optional extra contact information, and report-specific contact instructions for an existing report.
+- **SRS-FR-022 (MVP):** A request for a nonexistent report returns HTTP 404.
+- **SRS-FR-023 (Beta):** Add abuse reporting, automated redaction of sensitive card data, and moderator review.
 
 ## 4. External interface requirements
 
 ### 4.1 User interface
 
-The frontend must be responsive on phones, tablets, and desktops. It must offer a landing/hero area, a searchable report board, filters, sign-in form, report creation form, contact dialog, owner controls, safety guidance, and clear loading/error/empty states.
+The frontend must be responsive on phones, tablets, and desktops. It must offer a landing/hero area, a searchable report board, filters, sign-in form, report creation/edit form, single-report details view, contact dialog, owner controls, safety guidance, and clear loading/error/empty states.
 
 ### 4.2 API interface
 
@@ -111,7 +113,9 @@ JSON requests and responses use the `/api` prefix. Authenticated endpoints accep
 | POST | `/api/auth/logout` | Public-safe / token-aware | Invalidate current session when a token is supplied. |
 | GET | `/api/stats` | Public | Read aggregate counts. |
 | GET | `/api/items` | Public | Browse/search/filter reports; contact instructions remain hidden. |
+| GET | `/api/items/{id}` | Public | Read a single report; private contact instructions are only included for its owner. |
 | POST | `/api/items` | Signed in | Create a report. |
+| PUT | `/api/items/{id}` | Owner only | Update the report fields. |
 | GET | `/api/items/{id}/contact` | Signed in | Read reporter contact details and report-specific instructions. |
 | GET | `/api/items/{id}/image` | Public | Serve a report photo if one is attached. |
 | PATCH | `/api/items/{id}/status` | Owner only | Update a report's status. |
@@ -121,7 +125,7 @@ JSON requests and responses use the `/api` prefix. Authenticated endpoints accep
 
 - Browser to Vite frontend through HTTP during development.
 - Frontend to FastAPI through Vite `/api` proxy during development.
-- FastAPI to SQLite using SQLAlchemy.
+- FastAPI to the configured relational database using SQLAlchemy.
 - Beta: managed PostgreSQL, IUB SSO, controlled file storage, deployment secrets, and HTTPS.
 
 ## 5. Data requirements
