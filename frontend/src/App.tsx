@@ -3,12 +3,12 @@ import {
   ArrowDownRight, ArrowRight, Bell, BookOpen, BriefcaseBusiness, Check, CheckCircle2,
   ChevronDown, CircleHelp, Clock3, Compass, FileText, GraduationCap, HeartHandshake,
   KeyRound, Laptop, LifeBuoy, LockKeyhole, LogIn, MapPin, Menu, MessageCircle, Package, Phone, Plus,
-  Search, ShieldCheck, Sparkles, Tag, Trash2, UserRound, Wallet, Watch, X, Shirt, ImagePlus,
+  Search, ShieldCheck, Sparkles, Tag, Trash2, UserRound, Wallet, Watch, X, Shirt, ImagePlus, Eye, Pencil, RotateCcw,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
-  clearToken, createItem, deleteItem, getContact, getItems, getMe, getStats, getToken,
-  markResolved, saveToken, signIn, signOut,
+  clearToken, createItem, deleteItem, getContact, getItem, getItems, getMe, getStats, getToken,
+  saveToken, signIn, signOut, updateItem, updateStatus,
 } from './api'
 import type { BoardStats, CampusItem, ItemDraft, Student } from './types'
 
@@ -150,18 +150,19 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (u
   )
 }
 
-function ReportModal({ onClose, onSubmit, busy, error }: {
-  onClose: () => void; onSubmit: (draft: ItemDraft) => Promise<void>; busy: boolean; error: string
+function ReportModal({ onClose, onSubmit, busy, error, initialItem }: {
+  onClose: () => void; onSubmit: (draft: ItemDraft) => Promise<void>; busy: boolean; error: string; initialItem?: CampusItem
 }) {
-  const [reportType, setReportType] = useState<'lost' | 'found'>('lost')
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('Electronics')
-  const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('')
-  const [incidentDate, setIncidentDate] = useState(new Date().toISOString().slice(0, 10))
-  const [contactInfo, setContactInfo] = useState('Please contact me using the phone or WhatsApp details in my student profile.')
+  const [reportType, setReportType] = useState<'lost' | 'found'>(initialItem?.report_type ?? 'lost')
+  const [title, setTitle] = useState(initialItem?.title ?? '')
+  const [category, setCategory] = useState(initialItem?.category ?? 'Electronics')
+  const [description, setDescription] = useState(initialItem?.description ?? '')
+  const [location, setLocation] = useState(initialItem?.location ?? '')
+  const [incidentDate, setIncidentDate] = useState(initialItem?.incident_date ?? new Date().toISOString().slice(0, 10))
+  const [contactInfo, setContactInfo] = useState(initialItem?.contact_info ?? 'Please contact me using the phone or WhatsApp details in my student profile.')
   const [imageData, setImageData] = useState<string | null>(null)
   const [imageName, setImageName] = useState('')
+  const [imageChanged, setImageChanged] = useState(false)
   const [imageError, setImageError] = useState('')
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -188,6 +189,7 @@ function ReportModal({ onClose, onSubmit, busy, error }: {
       if (typeof reader.result === 'string') {
         setImageData(reader.result)
         setImageName(file.name)
+        setImageChanged(true)
       } else {
         setImageError('Could not read this image. Please try another file.')
       }
@@ -199,6 +201,7 @@ function ReportModal({ onClose, onSubmit, busy, error }: {
   function removeImage() {
     setImageData(null)
     setImageName('')
+    setImageChanged(true)
     setImageError('')
     const input = document.getElementById('item-image') as HTMLInputElement | null
     if (input) input.value = ''
@@ -207,12 +210,16 @@ function ReportModal({ onClose, onSubmit, busy, error }: {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (imageError) return
-    await onSubmit({ title, description, category, report_type: reportType, location, incident_date: incidentDate, contact_info: contactInfo, image_data: imageData })
+    await onSubmit({
+      title, description, category, report_type: reportType, location, incident_date: incidentDate, contact_info: contactInfo,
+      // Omit image_data for an edit when the user leaves the existing photo unchanged.
+      image_data: initialItem && !imageChanged ? undefined : imageData,
+    })
   }
 
   return (
-    <Modal title="Tell the campus community" eyebrow="NEW REPORT" onClose={onClose} wide>
-      <p className="modal-copy">Share a few helpful details and add a photo if you have one. For safety, do not include passwords, full card numbers, or other sensitive information.</p>
+    <Modal title={initialItem ? 'Update your report' : 'Tell the campus community'} eyebrow={initialItem ? 'EDIT REPORT' : 'NEW REPORT'} onClose={onClose} wide>
+      <p className="modal-copy">{initialItem ? 'Update the details below and save your changes.' : 'Share a few helpful details and add a photo if you have one.'} For safety, do not include passwords, full card numbers, or other sensitive information.</p>
       <form className="form-stack report-form" onSubmit={handleSubmit}>
         <div className="segmented" role="group" aria-label="Report type">
           <button type="button" className={reportType === 'lost' ? 'selected lost-selected' : ''} onClick={() => setReportType('lost')}><Search size={16} /> I lost something</button>
@@ -241,9 +248,9 @@ function ReportModal({ onClose, onSubmit, busy, error }: {
           </div>
           <div className="form-field form-field-full">
             <label className="field-label" htmlFor="item-image">Item photo <span className="optional-mark">(optional)</span></label>
-            <div className={`image-upload-box ${imageData ? 'has-image' : ''}`}>
-              {imageData ? (
-                <div className="image-upload-preview"><img src={imageData} alt="Preview of item to upload" /><div className="image-preview-copy"><strong>{imageName}</strong><span>Ready to attach to your report</span><Button type="button" variant="ghost" onClick={removeImage}><X size={14} /> Remove photo</Button></div></div>
+            <div className={`image-upload-box ${(imageData || (initialItem?.image_url && !imageChanged)) ? 'has-image' : ''}`}>
+              {imageData || (initialItem?.image_url && !imageChanged) ? (
+                <div className="image-upload-preview"><img src={imageData ?? initialItem?.image_url ?? ''} alt="Item photo preview" /><div className="image-preview-copy"><strong>{imageName || 'Current report photo'}</strong><span>{imageData ? 'Ready to attach to your report' : 'Existing photo will be kept'}</span><Button type="button" variant="ghost" onClick={removeImage}><X size={14} /> Remove photo</Button></div></div>
               ) : (
                 <label className="image-upload-prompt" htmlFor="item-image"><span className="image-upload-icon"><ImagePlus size={22} /></span><span><strong>Choose an item photo</strong><small>JPG, PNG or WebP · up to 2 MB</small></span><span className="image-upload-action">Browse files</span></label>
               )}
@@ -259,7 +266,7 @@ function ReportModal({ onClose, onSubmit, busy, error }: {
           </div>
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="form-actions"><Button variant="ghost" type="button" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy || Boolean(imageError)}>{busy ? 'Publishing…' : 'Publish report'} <ArrowRight size={17} /></Button></div>
+        <div className="form-actions"><Button variant="ghost" type="button" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy || Boolean(imageError)}>{busy ? (initialItem ? 'Saving…' : 'Publishing…') : (initialItem ? 'Save changes' : 'Publish report')} <ArrowRight size={17} /></Button></div>
       </form>
     </Modal>
   )
@@ -299,8 +306,14 @@ function ContactModal({ item, contact, loading, onClose, error }: {
   )
 }
 
-function ItemCard({ item, onContact, onResolve, onDelete, busyResolve }: {
-  item: CampusItem; onContact: (item: CampusItem) => void; onResolve: (item: CampusItem) => void; onDelete: (item: CampusItem) => void; busyResolve: boolean
+function ItemCard({ item, onView, onContact, onEdit, onResolve, onDelete, busyResolve }: {
+  item: CampusItem
+  onView: (item: CampusItem) => void
+  onContact: (item: CampusItem) => void
+  onEdit: (item: CampusItem) => void
+  onResolve: (item: CampusItem) => void
+  onDelete: (item: CampusItem) => void
+  busyResolve: boolean
 }) {
   return (
     <article className={`item-card ${item.status === 'resolved' ? 'item-card-resolved' : ''}`}>
@@ -313,8 +326,10 @@ function ItemCard({ item, onContact, onResolve, onDelete, busyResolve }: {
         <div className="item-card-footer">
           <div className="reporter"><span className="reporter-avatar">{item.reporter_name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span><div><strong>{item.reporter_name}</strong><span>{item.incident_date ? formatDate(item.incident_date) : 'Date not specified'}</span></div></div>
           <div className="card-actions">
+            <button className="contact-button" onClick={() => onView(item)} aria-label={`View details for ${item.title}`}>Details <Eye size={14} /></button>
             {item.status === 'open' && <button className="contact-button" onClick={() => onContact(item)} aria-label={`Contact reporter for ${item.title}`}>Connect <ArrowRight size={15} /></button>}
-            {item.is_owner && item.status === 'open' && <button className="resolve-button" disabled={busyResolve} onClick={() => onResolve(item)} title="Mark as resolved" aria-label="Mark report resolved"><CheckCircle2 size={17} /></button>}
+            {item.is_owner && <button className="resolve-button edit-button" onClick={() => onEdit(item)} title="Edit report" aria-label="Edit report"><Pencil size={14} /></button>}
+            {item.is_owner && <button className="resolve-button" disabled={busyResolve} onClick={() => onResolve(item)} title={item.status === 'open' ? 'Mark as resolved' : 'Reopen report'} aria-label={item.status === 'open' ? 'Mark report resolved' : 'Reopen report'}>{item.status === 'open' ? <CheckCircle2 size={17} /> : <RotateCcw size={15} />}</button>}
             {item.is_owner && <button className="resolve-button delete-button" onClick={() => onDelete(item)} title="Delete report" aria-label="Delete report"><Trash2 size={15} /></button>}
           </div>
         </div>
@@ -323,11 +338,43 @@ function ItemCard({ item, onContact, onResolve, onDelete, busyResolve }: {
   )
 }
 
+function ItemDetailsModal({ item, loading, error, onClose }: {
+  item: CampusItem; loading: boolean; error: string; onClose: () => void
+}) {
+  return (
+    <Modal title="Report details" eyebrow="ITEM RECORD" onClose={onClose} wide>
+      {loading ? <div className="contact-loading"><span className="spinner" /> Loading this report…</div> : error ? <p className="form-error" role="alert">{error}</p> : (
+        <div className="item-details-layout">
+          <div className="item-details-photo">{item.image_url ? <img src={item.image_url} alt={item.title} /> : <IconTile category={item.category} />}</div>
+          <div className="item-details-content">
+            <div className="details-badges"><span className={`type-pill ${item.report_type}`}>{item.report_type === 'lost' ? 'Lost item' : 'Found item'}</span><span className={`details-status ${item.status}`}>{item.status === 'open' ? 'Open' : 'Resolved'}</span></div>
+            <h3>{item.title}</h3>
+            <p className="details-description">{item.description}</p>
+            <dl className="details-list">
+              <div><dt>Category</dt><dd>{item.category}</dd></div>
+              <div><dt>Campus location</dt><dd>{item.location}</dd></div>
+              <div><dt>Date reported lost/found</dt><dd>{formatDate(item.incident_date)}</dd></div>
+              <div><dt>Posted by</dt><dd>{item.reporter_name}</dd></div>
+              <div><dt>Created</dt><dd>{formatCreatedAt(item.created_at)}</dd></div>
+              {item.is_owner && item.contact_info && <div><dt>Contact instructions</dt><dd>{item.contact_info}</dd></div>}
+            </dl>
+          </div>
+        </div>
+      )}
+      <div className="form-actions"><Button variant="secondary" onClick={onClose}>Close details</Button></div>
+    </Modal>
+  )
+}
+
 function App() {
   const [user, setUser] = useState<Student | null>(null)
   const [authReady, setAuthReady] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<CampusItem | null>(null)
+  const [detailItem, setDetailItem] = useState<CampusItem | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
   const [reportAfterLogin, setReportAfterLogin] = useState(false)
   const [contactItem, setContactItem] = useState<CampusItem | null>(null)
   const [contactData, setContactData] = useState<ContactDetails | null>(null)
@@ -403,6 +450,7 @@ function App() {
 
   function requestReportCreation() {
     setReportError('')
+    setEditingItem(null)
     if (user) {
       setReportOpen(true)
       return
@@ -423,7 +471,7 @@ function App() {
     setUser(nextUser)
     setRefreshKey((value) => value + 1)
     setReportAfterLogin(false)
-    if (shouldOpenReport) setReportOpen(true)
+    if (shouldOpenReport) { setEditingItem(null); setReportOpen(true) }
     notify(`Welcome, ${nextUser.full_name.split(' ')[0]}! You're signed in.`)
   }
 
@@ -433,30 +481,70 @@ function App() {
     notify('You have signed out.')
   }
 
-  async function handleCreateReport(draft: ItemDraft) {
-    // Guard the UI as well as the API: a report must never be submitted as a guest.
+  async function handleSaveReport(draft: ItemDraft) {
+    // Guard the UI as well as the API: reports may only be created/edited by signed-in owners.
     if (!user || !getToken()) {
       setReportOpen(false)
+      setEditingItem(null)
       setReportAfterLogin(true)
       setLoginOpen(true)
-      notify('Please sign in before posting a lost or found item.')
+      notify('Please sign in before managing a lost or found item.')
       return
     }
     setReportBusy(true)
     setReportError('')
     try {
-      await createItem(draft)
+      if (editingItem) {
+        await updateItem(editingItem.id, draft)
+        notify('Your report has been updated.')
+      } else {
+        await createItem(draft)
+        notify('Your report is live on the campus board.')
+      }
       setReportOpen(false)
+      setEditingItem(null)
       setSearch('')
       setCategory('All items')
       setReportType('all')
       setStatusFilter('open')
       setRefreshKey((value) => value + 1)
-      notify('Your report is live on the campus board.')
     } catch (err) {
-      setReportError(err instanceof Error ? err.message : 'Could not publish the report.')
+      setReportError(err instanceof Error ? err.message : 'Could not save the report.')
     } finally {
       setReportBusy(false)
+    }
+  }
+
+  async function handleView(item: CampusItem) {
+    setDetailItem(item)
+    setDetailLoading(true)
+    setDetailError('')
+    try {
+      setDetailItem(await getItem(item.id))
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : 'Could not load this report.')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  async function handleEdit(item: CampusItem) {
+    if (!user || !item.is_owner) {
+      notify('Please sign in as the report owner to edit this item.')
+      return
+    }
+    setReportError('')
+    try {
+      // Fetch one report by ID to populate the edit form with its latest saved values.
+      const current = await getItem(item.id)
+      if (!current.is_owner) {
+        notify('You can only edit your own reports.')
+        return
+      }
+      setEditingItem(current)
+      setReportOpen(true)
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Could not load the report for editing.')
     }
   }
 
@@ -481,11 +569,12 @@ function App() {
   }
 
   async function handleResolve(item: CampusItem) {
+    const nextStatus = item.status === 'open' ? 'resolved' : 'open'
     setResolvingId(item.id)
     try {
-      await markResolved(item.id)
+      await updateStatus(item.id, nextStatus)
       setRefreshKey((value) => value + 1)
-      notify('Marked as resolved. Thanks for closing the loop!')
+      notify(nextStatus === 'resolved' ? 'Marked as resolved. Thanks for closing the loop!' : 'Your report is open again.')
     } catch (err) {
       notify(err instanceof Error ? err.message : 'Could not update the report.')
     } finally {
@@ -600,7 +689,7 @@ function App() {
             {loading ? (
               <div className="items-grid" aria-label="Loading reports">{[1, 2, 3].map((item) => <div className="item-skeleton" key={item}><div className="skeleton-art" /><div className="skeleton-line skeleton-short" /><div className="skeleton-line" /><div className="skeleton-line skeleton-mid" /></div>)}</div>
             ) : items.length ? (
-              <div className="items-grid">{items.map((item) => <ItemCard key={item.id} item={item} onContact={handleContact} onResolve={handleResolve} onDelete={handleDelete} busyResolve={resolvingId === item.id} />)}</div>
+              <div className="items-grid">{items.map((item) => <ItemCard key={item.id} item={item} onView={handleView} onContact={handleContact} onEdit={handleEdit} onResolve={handleResolve} onDelete={handleDelete} busyResolve={resolvingId === item.id} />)}</div>
             ) : (
               <div className="empty-state"><div className="empty-illustration"><Search size={29} /><Sparkles size={17} /></div><h3>{boardHasFilters ? 'No matching reports yet' : 'A fresh start for the board'}</h3><p>{boardHasFilters ? 'Try another search, category, or report status. A few different keywords can help.' : 'Nothing on the board just yet. Share a report and help the IUB community find its way.'}</p>{boardHasFilters ? <Button variant="secondary" onClick={() => { setSearch(''); setCategory('All items'); setReportType('all'); setStatusFilter('open') }}>Clear filters</Button> : <Button onClick={requestReportCreation}><Plus size={16} /> Post the first report</Button>}</div>
             )}
@@ -626,7 +715,8 @@ function App() {
 
       {!authReady && <div className="auth-restoring"><span className="spinner" /> Restoring your session…</div>}
       {loginOpen && <LoginModal onClose={closeLogin} onSuccess={handleLoginSuccess} />}
-      {reportOpen && <ReportModal onClose={() => { setReportOpen(false); setReportError('') }} onSubmit={handleCreateReport} busy={reportBusy} error={reportError} />}
+      {reportOpen && <ReportModal key={editingItem ? `edit-${editingItem.id}` : 'create-report'} initialItem={editingItem ?? undefined} onClose={() => { setReportOpen(false); setEditingItem(null); setReportError('') }} onSubmit={handleSaveReport} busy={reportBusy} error={reportError} />}
+      {detailItem && <ItemDetailsModal item={detailItem} loading={detailLoading} error={detailError} onClose={() => { setDetailItem(null); setDetailError('') }} />}
       {contactItem && <ContactModal item={contactItem} contact={contactData} loading={contactLoading} error={contactError} onClose={() => { setContactItem(null); setContactData(null); setContactError('') }} />}
       {toast && <div className="toast-message" role="status"><span><CheckCircle2 size={17} /></span>{toast}</div>}
     </div>

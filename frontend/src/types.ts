@@ -48,5 +48,5 @@ export interface ItemDraft {
   location: string
   incident_date: string
   contact_info: string
-  image_data: string | null
+  image_data?: string | null
 }
